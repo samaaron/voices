@@ -23,10 +23,12 @@
   [raw]
   (let [raw-pitch    (:content (first (filter #(= :pitch (:tag %)) raw)))
         raw-duration (:content (first (filter #(= :duration (:tag %)) raw)))
+        tie          (:type (:attrs (first (filter #(= :tie (:tag %)) raw))))
         pitch        (extract-pitch-data raw-pitch)
         duration     (Integer. (first raw-duration))]
     {:pitch pitch
-     :duration duration}))
+     :duration duration
+     :tie tie}))
 
 (defn sensible-measure
   [raw]
@@ -37,7 +39,7 @@
     {:num   num
      :notes notes}))
 
-(defn measures
+(defn parse-measures
   [st-zip]
   (let [raw (:content (ffirst (zx/xml-> st-zip :part)))]
     (filter identity (map sensible-measure raw))))
@@ -45,10 +47,23 @@
 (defn play-measure
   [m]
   (doseq [note (:notes m)]
-    (when-let [n (:pitch note)]
-      (sampled-piano n))
-    (println "Playing: "(or (:pitch note) 0))
+    (when (and (:pitch note) (< 0 (:pitch note)))
+      (if (not= "stop" (:tie note))
+        (do
+          (println "Playing: "(or (:pitch note) 0))
+          (sampled-piano (:pitch note)))
+        (println "(Cont):  " (or (:pitch note) 0))))
+
     (Thread/sleep (* (:duration note) 300))))
+
+(defn mk-score
+  [st-zip]
+  (let [measures (parse-measures st-zip)
+        composer (first (:content (ffirst (zx/xml-> st-zip :identification :creator))))
+        title    (first (:content (ffirst (zx/xml-> st-zip :movement-title))))]
+    {:measures measures
+     :composer composer
+     :title title}))
 
 (defn play-score
   [measures]
@@ -57,4 +72,10 @@
 
 (defn play-xml
   []
-  (play-score (measures (mk-st-zip))))
+  (let [score (mk-score (mk-st-zip))]
+    (println "\n\n===")
+    (println "Found" (:title score) "by" (:composer score))
+    (println "===")
+    (play-score (:measures score))))
+
+;;(play-xml)

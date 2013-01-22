@@ -5,8 +5,12 @@
             [clojure.zip :as zip]
             [clojure.data.zip.xml :as zx]))
 
-(def st-xml (xml/parse "resources/summertime.xml"))
-(def st-zip (zip/xml-zip st-xml))
+(def xml-path "resources/summertime.xml")
+
+(defn mk-st-zip
+  []
+  (let [st-xml (xml/parse xml-path)]
+    (zip/xml-zip st-xml)))
 
 (defn extract-pitch-data
   [raw]
@@ -38,18 +42,12 @@
   (let [raw (:content (ffirst (zx/xml-> st-zip :part)))]
     (filter identity (map sensible-measure raw))))
 
-(defsynth foo [note 0]
-  (out 0 (pan2 (sin-osc (midicps note)))))
-
-(def f (foo))
-
 (defn play-measure
   [m]
   (doseq [note (:notes m)]
-    ;;    (ctl f :note (or (:pitch note) 0))
     (when-let [n (:pitch note)]
       (sampled-piano n))
-    (println (or (:pitch note) 0))
+    (println "Playing: "(or (:pitch note) 0))
     (Thread/sleep (* (:duration note) 300))))
 
 (defn play-score
@@ -57,8 +55,6 @@
   (doseq [m measures]
     (play-measure m)))
 
-(play-score (measures st-zip))
-
-(stop)
-
-(sampled-piano)
+(defn play-xml
+  []
+  (play-score (measures (mk-st-zip))))
